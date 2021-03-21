@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,22 +46,27 @@ void q_free(queue_t *q)
  */
 bool q_insert_head(queue_t *q, char *s)
 {
-    list_ele_t *newh;
     if (!q)
         return false;
 
-    newh = malloc(sizeof(list_ele_t));
-    newh->value = malloc(strlen(s) + 1);
+    list_ele_t *newh;
 
+    newh = malloc(sizeof(list_ele_t));
+    if (!newh)
+        return false;
+
+    newh->value = malloc(strlen(s) + 1);
     if (!newh->value) {
         free(newh);
         return false;
     }
 
-    strncpy(newh->value, s, strlen(s) + 1);
+    strncpy(newh->value, s, strlen(s));
+    *(newh->value + strlen(s)) = '\0';
 
     newh->next = q->head;
     q->head = newh;
+
     if (q->size == 0) {
         q->tail = newh;
     }
@@ -95,7 +101,9 @@ bool q_insert_tail(queue_t *q, char *s)
         free(node);
         return false;
     }
-    strncpy(node->value, s, strlen(s) + 1);
+
+    strncpy(node->value, s, strlen(s));
+    *(node->value + strlen(s)) = '\0';
 
     if (q->size == 0) {
         q->head = node;
@@ -118,15 +126,21 @@ bool q_insert_tail(queue_t *q, char *s)
  */
 bool q_remove_head(queue_t *q, char *sp, size_t bufsize)
 {
-    if (!q) {
+    if (!q || !q->head) {
         return false;
     }
+
     list_ele_t *tmp = q->head;
 
-    int valuelen = strlen(q->head->value) + 1;
-    int len = bufsize < valuelen ? bufsize : valuelen;
-    strncpy(sp, q->head->value, len);
-    q->head = q->head->next;
+    size_t tmplen = strlen(tmp->value);
+    size_t cpylen = tmplen < bufsize - 1 ? tmplen : bufsize - 1;
+
+    if (sp) {
+        strncpy(sp, tmp->value, cpylen);
+        *(sp + cpylen) = '\0';
+    }
+
+    q->head = tmp->next;
     q->size -= 1;
 
     free(tmp->value);
@@ -156,6 +170,9 @@ int q_size(queue_t *q)
  */
 void q_reverse(queue_t *q)
 {
+    if (!q || !q->head)
+        return;
+
     list_ele_t *pre = q->head;
     list_ele_t *next = q->head->next;
     q->tail = q->head;
@@ -169,6 +186,45 @@ void q_reverse(queue_t *q)
     }
 }
 
+static list_ele_t *merge(list_ele_t *left, list_ele_t *right)
+{
+    list_ele_t *head = NULL;
+
+    for (list_ele_t **iter = &head; true; iter = &((*iter)->next)) {
+        if (!left) {
+            *iter = right;
+            break;
+        }
+        if (!right) {
+            *iter = left;
+            break;
+        }
+        if (strcmp(left->value, right->value) < 0) {
+            *iter = left;
+            left = left->next;
+        } else {
+            *iter = right;
+            right = right->next;
+        }
+    }
+
+    return head;
+}
+static list_ele_t *mergeSort(list_ele_t *head)
+{
+    if (!head || !head->next)
+        return head;
+
+    list_ele_t *slow = head, *fast;
+
+    for (fast = head->next; fast && fast->next; fast = fast->next->next) {
+        slow = slow->next;
+    }
+    list_ele_t *mid = slow->next;
+    slow->next = NULL;
+
+    return merge(mergeSort(head), mergeSort(mid));
+}
 /*
  * Sort elements of queue in ascending order
  * No effect if q is NULL or empty. In addition, if q has only one
@@ -176,6 +232,10 @@ void q_reverse(queue_t *q)
  */
 void q_sort(queue_t *q)
 {
-    /* TODO: You need to write the code for this function */
-    /* TODO: Remove the above comment when you are about to implement. */
+    if (!q || !q->head)
+        return;
+    q->head = mergeSort(q->head);
+
+    for (; q->tail->next; q->tail = q->tail->next)
+        ;
 }
